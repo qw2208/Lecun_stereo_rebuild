@@ -1,6 +1,5 @@
 import os
 import re
-import png
 import sys
 import numpy as np
 import random
@@ -8,75 +7,50 @@ import cv2
 from scipy import misc
 import glob
 from PIL import Image
+import h5py
 
 NEGATIVE_LOW = 4
 NEGATIVE_HIGH = 10
-cal = [0]
-def storePatch(imgL,imgR, imgGround):
-    i = random.choice([m for m in xrange(370)])
-    j = random.choice([m for m in xrange(1226)])
-    try:
-        o_positive = random.randint(-1,1)
-        sign = random.choice([-1,1])
-        o_negative = sign * random.randint(NEGATIVE_LOW, NEGATIVE_HIGH)
-        
-        print cal
-
-        imgLPatch = imgL.crop((j-5, i-5, j+6, i+6))
-        disp = int(imgGround[i][j])
-        print disp
-        if np.sum(np.array(imgLPatch))==0 or disp== 0:
-            storePatch(imgL, imgR, imgGround)
-            return
-        cal[0] += 1
-        imgRPatchPos = imgR.crop((j+o_positive-disp-5,i-5,j+o_positive-disp+6,i+6))
-        nameRightPos = "/Volumes/Myspace/Courses/Project/mynetwork/patches/{}RPositive.png".format(cal[0])
-        imgRPatchPos.save(nameRightPos)
-        nameLeft = "/Volumes/Myspace/Courses/Project/mynetwork/patches/{}L.png".format(cal[0])
-        imgLPatch.save(nameLeft)
-        
-        imgRPatchNeg = imgR.crop((j+o_negative-disp-5, i-5, j+o_negative-disp+6, i+6))
-        nameRightNeg = "/Volumes/Myspace/Courses/Project/mynetwork/patches/{}RNegative.png".format(cal[0])
-        imgRPatchNeg.save(nameRightNeg)
-    except:
-        storePatch(imgL,imgR,imgGround)
-        return
-
-def readImage(pathL, pathR, pathGround):
-    imgL = Image.open(pathL)
-    imgR = Image.open(pathR)
-    imgGround = Image.open(pathGround)
-    imgGround = np.array(imgGround)
-    imgGround = imgGround*1.0/256
-    # print list(imgGround)
-    return imgL, imgR, imgGround
-
-def loadImage():
-    currPath = "/Volumes/Myspace/Courses/Project/mynetwork/training/"
-    os.chdir(currPath + "image_0/")
-    namesL = glob.glob("*_10.png")
-    os.chdir(currPath + "image_1/")
-    namesR = glob.glob("*_10.png")
-    os.chdir(currPath + "disp_noc/")
-    namesGroundTruth = glob.glob("*_10.png")
-    while (cal[0]!=100):
-        randomNumber = random.randint(0,193)
-        pathL = currPath + "image_0/" + namesL[randomNumber]
-        pathR = currPath + "image_1/" + namesR[randomNumber]
-        pathGound = currPath + "disp_noc/" + namesGroundTruth[randomNumber]
-        imgL, imgR, imgGround = readImage(pathL, pathR, pathGound)
-        storePatch(imgL, imgR, imgGround)
+cal = 0
 
 if __name__=='__main__':
-    loadImage()
+    with h5py.File("/home/qw2208/research/trainPatches.hdf5", "w") as f1:
+        with h5py.File("/home/qw2208/research/trainImgs.hdf5", "r") as f2:
+            grpLeft = f1.create_group("left")
+            grpRightPos = f1.create_group("rightPos")
+            grpRightNeg = f1.create_group("rightNeg")
+            while (cal!=50000):
+                randomNumber = str(random.randint(0,193))
+                imgL = Image.fromarray((f2['left/'+randomNumber][()]))
+                imgR = Image.fromarray(f2['right/'+randomNumber][()])
+                imgGround = f2['groundtruth/'+randomNumber][()]
+ 
+                i = random.choice([m for m in xrange(370)])
+                j = random.choice([m for m in xrange(1226)])
+                o_positive = random.randint(-1,1)
+                sign = random.choice([-1,1])
+                o_negative = sign * random.randint(NEGATIVE_LOW, NEGATIVE_HIGH)
 
-
-
-
-
-
-
-
-
-
-
+                if j-5>0 and i-5>0 and j+6<imgL.size[0] and i+6<imgL.size[1]:
+                    imgLPatch = imgL.crop((j-5, i-5, j+6, i+6))
+                    disp = int(float(imgGround[i][j])/256)
+                    if np.sum(np.array(imgLPatch))==0 or disp==0:
+                        continue
+                    grpLeft.create_dataset(name=str(cal), data=imgLPatch)
+                    if cal%10 is 0:
+                      print "processing....", cal
+                    if j+o_positive-disp+6 < imgL.size[0] and j+o_negative-disp+6 < imgL.size[0]:
+                        imgRPatchPos = np.array(imgR.crop((j+o_positive-disp-5, i-5, j+o_positive-disp+6, i+6)))
+                        grpRightPos.create_dataset(str(cal), data=imgRPatchPos)
+                        imgRPatchNeg = imgR.crop((j+o_negative-disp-5, i-5, j+o_negative-disp+6, i+6))
+                        grpRightNeg.create_dataset(str(cal), data=imgRPatchNeg)
+                        cal+=1
+                    
+#                    nameRightPos = "/home/users/shixin.li/segment/data_stereo/patches/{}RPositive.png".format(cal[0])
+#                    imgRPatchPos.save(nameRightPos)
+#                   nameLeft = "/home/users/shixin.li/segment/data_stereo/patches/{}L.png".format(cal[0])
+#                    imgLPatch.save(nameLeft)
+        
+#                    imgRPatchNeg = imgR.crop((j+o_negative-disp-5, i-5, j+o_negative-disp+6, i+6))
+#                    nameRightNeg = "/home/users/shixin.li/segment/data_stereo/patches/{}RNegative.png".format(cal[0])
+#                    imgRPatchNeg.save(nameRightNeg)
