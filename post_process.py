@@ -12,4 +12,4 @@ test = np.power(test, 0.2).astype(np.float)
 print test
 plt.imshow(test)
 plt.axis('off')
-plt.savefig('disp2.png')
+plt.savefig('result.png')
